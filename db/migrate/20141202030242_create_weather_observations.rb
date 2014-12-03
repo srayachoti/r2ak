@@ -6,7 +6,9 @@ class CreateWeatherObservations < ActiveRecord::Migration
 
       t.float      :wind_speed
       t.integer    :wind_direction
+    end
 
+    change_table :weather_observations do |t|
       t.index      [:weather_station_id, :observed_at], unique: true
     end
   end

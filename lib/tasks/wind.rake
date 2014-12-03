@@ -1,37 +1,43 @@
 require 'csv'
 require 'date'
+require 'fileutils'
 require 'rest-client'
 
 namespace :wind do
-  DataDir = Rails.root.join('data')
+  STATION_IDS = %w(27226 96 6831 6813 152 27382 145 153 29733 137)
+  YEAR_RANGE  = 1994..2014
+  MONTH_RANGE = 6..6
 
-  desc "Scrape hourly wind data from 1994-2014"
+  DATA_DIR = Rails.root.join('data')
+
+  desc "Scrape hourly wind data from #{YEAR_RANGE.first}-#{YEAR_RANGE.last}"
   task :scrape do
-    BulkURL    = %q(http://climate.weather.gc.ca/climateData/bulkdata_e.html)
-    StationIDs = %w(27226 96 6831 6813 152 27382 145 153 29733 137)
-    YearRange  = 1994..2014
-    MonthRange = 6..6
-
-    for station_id in StationIDs
+    BULK_URL    = %q(http://climate.weather.gc.ca/climateData/bulkdata_e.html)
+    for station_id in STATION_IDS
       puts "fetching data for station #{station_id} ..."
  
-      for year in YearRange
-        for month in MonthRange
+      for year in YEAR_RANGE
+        for month in MONTH_RANGE
           date = Date.new(year, month)
 
           puts "fetching data for #{date.strftime('%Y-%m-%d')} ..."
 
-          response = RestClient.get BulkURL, :params => {
-                                               :format    => :csv,
-                                               :stationID => station_id,
-                                               :Year      => date.year,
-                                               :Month     => date.month,
-                                               :timeframe => 1
-                                             }
+          response = RestClient.get BULK_URL, :params => {
+                                                :format    => :csv,
+                                                :stationID => station_id,
+                                                :Year      => date.year,
+                                                :Month     => date.month,
+                                                :timeframe => 1
+                                              }
 
           if response.code == 200
             filename = "#{station_id}-#{date.strftime('%Y%m%d')}.csv"
-            File.open(DataDir.join(filename), 'w') { |f| f.write response.body.encode("UTF-8", :invalid => :replace, :undef => :replace, :replace => '?') }
+
+            FileUtils.mkpath DATA_DIR
+
+            File.open(DATA_DIR.join(filename), 'w') do |f|
+              f.write response.body.encode('UTF-8', :invalid => :replace, :undef => :replace, :replace => '?')
+            end
           else
             STDERR.puts "failed to fetch data for station #{station_id} for #{date.strftime('%Y-%m-%d')}"
           end
@@ -46,7 +52,7 @@ namespace :wind do
   task :import do
     speeds = []
 
-    for filename in Dir.glob(DataDir.join('*.csv'))
+    for filename in Dir.glob(DATA_DIR.join('*.csv'))
       unless filename.match(/(\d+)-/) 
         STDERR.puts "failed to determine station ID from #{filename}"
         next

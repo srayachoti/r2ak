@@ -4,8 +4,10 @@ class CreateWeatherStations < ActiveRecord::Migration
       t.string  :name
       t.string  :province
       t.point   :latlon
+    end
 
-      t.index   :latlon, spatial: true
+    change_table :weather_stations do |t|
+      t.index :latlon, :spatial => true
     end
   end
 end
