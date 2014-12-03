@@ -15,12 +15,12 @@ namespace :wind do
     BULK_URL    = %q(http://climate.weather.gc.ca/climateData/bulkdata_e.html)
     for station_id in STATION_IDS
       puts "fetching data for station #{station_id} ..."
- 
+
       for year in YEAR_RANGE
         for month in MONTH_RANGE
           date = Date.new(year, month)
 
-          puts "fetching data for #{date.strftime('%Y-%m-%d')} ..."
+          puts "fetching data from #{date.strftime('%Y-%m-%d')} ..."
 
           response = RestClient.get BULK_URL, :params => {
                                                 :format    => :csv,
@@ -49,43 +49,46 @@ namespace :wind do
   end
 
   desc "Import scraped wind data into the database"
-  task :import do
-    speeds = []
-
+  task :import => :environment do
     for filename in Dir.glob(DATA_DIR.join('*.csv'))
-      unless filename.match(/(\d+)-/) 
+      unless filename.match(/(\d+)-(\d+)/)
         STDERR.puts "failed to determine station ID from #{filename}"
         next
       end
-      station_id = $1
- 
+      station_id, observation_date = $1.to_i, Date.strptime($2, '%Y%m%d')
+
       csv = CSV.read(filename)
 
-      puts "data for station #{station_id}:"
+      station_name, province, latlon = nil
+      station_name = csv[0][1]
+      province     = csv[1][1]
+      latlon       = "POINT(#{csv[2][1].to_f} #{csv[3][1].to_f})"
 
-      station_rows = csv[0..3]
-      station_rows.each do |row|
-        puts "#{row[0]}: #{row[1]}"
-      end
+      WeatherStation.where(
+        id: station_id
+      ).first_or_create!(
+        name: station_name, province: province, latlon: latlon
+      )
+
+      puts "importing data from station #{station_id} on #{observation_date.strftime('%Y-%m-%d')} ..."
 
       weather_rows = csv[17..-1]
       weather_rows.each do |row|
-        time  = DateTime.strptime(row[0], '%Y-%m-%d %H:%M')
-        dir   = row[12].present? ? row[12].to_i*10 : nil
-        speed = row[14].present? ? row[14].to_i : nil
+        observation_datetime = DateTime.strptime(row[0], '%Y-%m-%d %H:%M')
 
-        speeds.push(speed) if speed
+        wind_direction = row[12].present? ? row[12].to_i*10 : nil
+        wind_speed     = row[14].present? ? row[14].to_i    : nil
 
-        #puts "#{time.strftime('%Y-%m-%d %H:%M')}: #{speed} km/h, #{dir} deg"
-      end 
+        WeatherObservation.where(
+          weather_station_id: station_id,
+          observation_date:   observation_datetime.to_date,
+          observation_hour:   observation_datetime.hour
+        ).first_or_create!(
+          wind_speed: wind_speed, wind_direction: wind_direction
+        )
+      end
+    end
 
-      puts
-    end 
-
-    speeds.sort!
-    puts "min speed: #{speeds.first*0.539957} kts"
-    puts "max speed: #{speeds.last*0.539957} kts"
-    puts "avg speed: #{speeds.inject { |sum, s| sum + s }.to_f/speeds.size*0.539957} kts"
-    puts "median speed: #{speeds[speeds.length/2]*0.539957} kts"
+    puts
   end
 end

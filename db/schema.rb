@@ -151,20 +151,23 @@ ActiveRecord::Schema.define(:version => 20141202030242) do
   add_index "virts_geometry_columns_statistics", ["virt_name", "virt_geometry"], :name => "sqlite_autoindex_virts_geometry_columns_statistics_1", :unique => true
 
   create_table "weather_observations", :force => true do |t|
-    t.integer  "weather_station_id"
-    t.datetime "observed_at"
-    t.float    "wind_speed"
-    t.integer  "wind_direction"
+    t.integer "weather_station_id", :null => false
+    t.date    "observation_date",   :null => false
+    t.integer "observation_hour",   :null => false
+    t.float   "wind_speed"
+    t.integer "wind_direction"
   end
 
-  add_index "weather_observations", ["weather_station_id", "observed_at"], :name => "index_weather_observations_on_weather_station_id_and_observed_at", :unique => true
+  add_index "weather_observations", ["weather_station_id", "observation_date", "observation_hour"], :name => "index_weather_observations_on_station_id_and_observation_time", :unique => true
 
-  create_table "weather_stations", :force => true do |t|
-    t.string  "name"
-    t.string  "province"
-    t.spatial "latlon",   :limit => {:srid=>0, :type=>"point"}
+  create_table "weather_stations", :id => false, :force => true do |t|
+    t.integer "id",                                             :null => false
+    t.string  "name",                                           :null => false
+    t.string  "province",                                       :null => false
+    t.spatial "latlon",   :limit => {:srid=>0, :type=>"point"}, :null => false
   end
 
+  add_index "weather_stations", ["id"], :name => "index_weather_stations_on_id", :unique => true
   add_index "weather_stations", ["latlon"], :name => "idx_weather_stations_latlon", :spatial => true
 
 end

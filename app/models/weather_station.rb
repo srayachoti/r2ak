@@ -1,5 +1,7 @@
 class WeatherStation < ActiveRecord::Base
-  set_rgeo_factory_for_column :latlon, RGeo::Geographic.spherical_factory
+  self.rgeo_factory_generator = RGeo::Geos.method(:factory)
+
+  attr_accessible :name, :province, :latlon
 
   has_many :weather_observations
 end
